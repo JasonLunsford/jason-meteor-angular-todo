@@ -14,6 +14,8 @@ if (Meteor.isClient) {
 
     angular.module('simple-todos', ['angular-meteor']);
 
+    // bootstrap Angular manually to accommodate different ready events understood
+    // by different devices
     if (Meteor.isCordova)
       angular.element(document).on('deviceready', onReady);
     else
