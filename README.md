@@ -1,3 +1,6 @@
-## Jason's Cool Meteor + AngularJS 1.x Todo
+## Jason's Cool Angular+Meteor Todo Tutorial
 
-A sandbox project
+Tutorial available here:
+https://www.meteor.com/tutorials/angular/creating-an-app
+
+Starting over again? Follow the tutorial to configure your environment, then clone this repo.
