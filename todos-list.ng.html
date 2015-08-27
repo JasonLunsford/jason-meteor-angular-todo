@@ -20,10 +20,21 @@
 	</header>
 
 	<ul ng-repeat="task in tasks">
-		<li ng-class="{'checked': task.checked}">
-			<button class="delete" ng-click="tasks.remove(task)">&times;</button>
+		<li ng-class="{'checked': task.checked, 'private': task.private}">
+			<!-- Calling remove a big no-no, using Meteor method now -->
+			<!-- <button class="delete" ng-click="tasks.remove(task)">&times;</button> -->
+			<button class="delete" ng-click="deleteTask(task)">&times;</button>
 
-			<input type="checkbox" ng-model="task.checked" class="toggle-checked" />
+			<input type="checkbox"
+				   class="toggle-checked"
+				   ng-checked="task.checked"
+				   ng-click="setChecked(task)" />
+
+			<button class="toggle-private"
+					ng-if="task.owner === $root.currentUser._id"
+					ng-click="setPrivate(task)">
+				{{task.private == true ? "Private" : "Public"}}
+			</button>
 
 			<span class="text">
 				<strong>{{task.username}}</strong> - {{task.text}}

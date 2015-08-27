@@ -23,7 +23,11 @@ if (Meteor.isClient) {
       function ($scope, $meteor) {
 
         // Straight call to collection to get contents of Tasks db, no db sorting
+        // only possible when meteor autopublish package installed
         // $scope.tasks = $meteor.collection(Tasks);
+
+        // client subscribes to available server publications via this method
+        $scope.$meteorSubscribe('tasks');
 
         $scope.tasks = $meteor.collection( function() {
           // sorts the newest tasks to the top
@@ -38,18 +42,28 @@ if (Meteor.isClient) {
           return Tasks.find($scope.getReactively('query'), {sort: {createdAt: -1}});
         });
 
-        $scope.addTask = function(newTask) {
-          $scope.tasks.push(
-            {
-              text: newTask,
-              createdAt: new Date(),
-              owner: Meteor.userId(),
-              username: Meteor.user().username
-            }
-          );
+        $scope.addTask = function (newTask) {
+          // call Meteor method, direct DB manipulation a no-no
+          $meteor.call('addTask', newTask);
         };
 
-        $scope.$watch('hideCompleted', function() {
+        $scope.deleteTask = function (task) {
+          $meteor.call('deleteTask', task._id);
+        };
+
+        $scope.setChecked = function (task) {
+          $meteor.call('setChecked', task._id, !task.checked);
+        };
+
+        $scope.setPrivate = function (task) {
+          /*
+            note call accepts 1+n parameters:
+            $meteor.call('nameOfMeteorMethod', param1, param2)
+          */
+          $meteor.call('setPrivate', task._id, !task.private);
+        };
+
+        $scope.$watch('hideCompleted', function () {
           if ($scope.hideCompleted)
             $scope.query = {checked: {$ne: true}};
           else
@@ -65,7 +79,67 @@ if (Meteor.isClient) {
 
 // Server only code
 if (Meteor.isServer) {
-  Meteor.startup(function () {
-    // code to run on server at startup
+  // returns documents in task collection
+  Meteor.publish('tasks', function() {
+    return Tasks.find({
+      $or: [
+        { private: {$ne: true} },
+        { owner: this.userId }
+      ]
+    });
   });
 }
+
+// Separation of database logic from event handlers / general client side code good for the soul
+// also, these methods are meant for client & server to support optimistic UI
+Meteor.methods({
+    addTask: function (text) {
+      // Make sure user is logged on
+      if (!Meteor.userId()) {
+        throw new Meteor.Error('not-authorized');
+      }
+
+      Tasks.insert({
+        text: text,
+        createdAt: new Date(),
+        owner: Meteor.userId(),
+        username: Meteor.user().username
+      });
+    },
+    deleteTask: function (taskId) {
+      var task = Tasks.findOne(taskId);
+
+      // Check if task configured as private and if current user matches task owner
+      if (task.private && task.owner !== Meteor.userId()) {
+        // no match, throw error
+        throw new Meteor.Error('not-authorized');
+      }
+
+      // Only task owners allowed to delete their todo items
+      if (task.owner !== Meteor.userId()) {
+        throw new Meteor.Error('not-authorized');
+      }
+
+      Tasks.remove(taskId);
+    },
+    setChecked: function (taskId, setChecked) {
+      var task = Tasks.findOne(taskId);
+
+      // Only owner allowed to check off tasks flagged as private
+      if (task.private && task.owner !== Meteor.user()) {
+        throw new Meteor.Error('not-authorized');
+      }
+
+      Tasks.update(taskId, { $set: { checked: setChecked} });
+    },
+    setPrivate: function (taskId, setToPrivate) {
+      var task = Tasks.findOne(taskId);
+
+      // Ensure only task owner can make task private
+      if (task.owner !== Meteor.userId()) {
+        throw new Meteor.Error('not-authorized');
+      }
+
+      Tasks.update(taskId, { $set: { private: setToPrivate } });
+    }
+});
